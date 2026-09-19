@@ -14,3 +14,6 @@ Desktop.ini
 *.tmp
 *.bak
 ytdlp_download_*.bat
+
+# Manifesto do conector nativo gerado pelo install_host.bat
+native_host/com.ytdlp.downloader.json

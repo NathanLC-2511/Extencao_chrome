@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "yt-dlp YouTube Audio Downloader",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Baixe áudio de vídeos do YouTube diretamente via yt-dlp selecionando o formato e destino.",
   "permissions": [
     "nativeMessaging",
@@ -21,6 +21,7 @@
         "https://www.youtube.com/*"
       ],
       "js": [
+        "shared/constants.js",
         "content/modal.js",
         "content/content.js"
       ],

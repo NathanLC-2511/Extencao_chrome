@@ -49,6 +49,11 @@ function Find-Tool {
 }
 
 try {
+    # Limpar proativamente arquivos temporarios antigos (mais de 10 min)
+    Get-ChildItem -Path $env:TEMP -Filter "ytdlp_download_*.bat" -ErrorAction SilentlyContinue |
+        Where-Object { (Get-Date) - $_.CreationTime -gt (New-TimeSpan -Minutes 10) } |
+        Remove-Item -Force -ErrorAction SilentlyContinue
+
     $request = Read-NativeMessage
     if (-not $request) {
         exit 0
@@ -61,6 +66,58 @@ try {
 
     $ytdlp = Find-Tool "yt-dlp"
     $ffmpeg = Find-Tool "ffmpeg"
+
+    # Tratar acao de teste explicitamente antes de qualquer tentativa de download
+    if ($action -eq "test") {
+        if (-not $ytdlp) {
+            Send-NativeMessage @{
+                status  = "error"
+                message = "yt-dlp nao foi encontrado no sistema. Instale via 'winget install yt-dlp' ou adicione ao PATH."
+                ytdlp   = $false
+                ffmpeg  = [bool]$ffmpeg
+            }
+            exit 0
+        }
+
+        Send-NativeMessage @{
+            status  = "success"
+            message = "Conector ativo e yt-dlp pronto para uso!"
+            ytdlp   = $true
+            ffmpeg  = [bool]$ffmpeg
+        }
+        exit 0
+    }
+
+    # Rejeitar requisicoes sem URL ou com URL invalida
+    if ([string]::IsNullOrWhiteSpace($url)) {
+        Send-NativeMessage @{
+            status  = "error"
+            message = "URL do video nao informada."
+        }
+        exit 0
+    }
+
+    $url = $url.Trim()
+    # Validar formato de URL e proibir caracteres perigosos para batch (aspas, pipes, redirecionamentos, quebras de linha)
+    if ($url -notmatch '^https?://[^\s"<>|\^]+$') {
+        Send-NativeMessage @{
+            status  = "error"
+            message = "URL invalida ou contem caracteres proibidos."
+        }
+        exit 0
+    }
+
+    # Validar formato contra lista permitida
+    $allowedFormats = @("mp3", "m4a", "opus", "flac", "wav", "aac")
+    $formatLower = if ($format) { $format.ToString().ToLower().Trim() } else { "mp3" }
+    if ($allowedFormats -notcontains $formatLower) {
+        $formatLower = "mp3"
+    }
+    $format = $formatLower
+
+    # Sanitizar caminho de destino (expandir variaveis e remover aspas/pipes/caracteres perigosos)
+    $outputPath = [Environment]::ExpandEnvironmentVariables($outputPath)
+    $outputPath = $outputPath -replace '["\r\n|<>^]', ''
 
     if (-not $ytdlp) {
         Send-NativeMessage @{
@@ -77,24 +134,29 @@ try {
         $ffmpegArg = "--ffmpeg-location `"$ffmpegDir`""
     }
 
+    # Em arquivos .bat, o simbolo % antes de tokens do yt-dlp como %(title)s precisa ser duplicado (%%)
+    # para nao ser interpretado/removido pelo cmd.exe como variavel de ambiente
+    $batOutputPath = $outputPath -replace '%(?=\()', '%%'
+
     # Construct the exact command requested:
     # yt-dlp -x --audio-format TIPO_ARQUIVO -o "LOCAL" "URL"
-    $fullCmd = "`"$ytdlp`" -x --audio-format $format $ffmpegArg -o `"$outputPath`" `"$url`""
+    $fullCmd = "`"$ytdlp`" -x --audio-format $format $ffmpegArg -o `"$batOutputPath`" `"$url`""
 
     # Launch in a new visible console window so the user sees live progress
+    # Ao final da execucao, o arquivo .bat se autoexclui do %TEMP%
     $runnerScript = @"
 @echo off
+chcp 65001 >nul
 title yt-dlp Downloader - $format
 color 0A
 echo ========================================================
 echo   yt-dlp Audio Downloader
 echo ========================================================
-echo URL:    $url
-echo Formato: $format
-echo Destino: $outputPath
+echo URL:     "$url"
+echo Formato: "$format"
+echo Destino: "$batOutputPath"
 echo.
-echo Executando:
-echo $fullCmd
+echo Executando comando...
 echo ========================================================
 echo.
 $fullCmd
@@ -111,10 +173,11 @@ if %ERRORLEVEL% EQU 0 (
 )
 echo.
 pause
+(goto) 2>nul & del "%~f0"
 "@
 
     $tempBat = "$env:TEMP\ytdlp_download_$(Get-Random).bat"
-    [System.IO.File]::WriteAllText($tempBat, $runnerScript, [System.Text.Encoding]::ASCII)
+    [System.IO.File]::WriteAllText($tempBat, $runnerScript, [System.Text.Encoding]::UTF8)
 
     Start-Process -FilePath "cmd.exe" -ArgumentList "/c `"$tempBat`""
 

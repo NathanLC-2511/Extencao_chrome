@@ -1,16 +1,18 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
   <meta charset="UTF-8">
   <title>yt-dlp Downloader</title>
   <link rel="stylesheet" href="popup.css">
 </head>
+
 <body>
   <div class="popup-container">
     <header class="popup-header">
       <div class="header-logo">
         <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
-          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z" />
         </svg>
       </div>
       <div>
@@ -42,8 +44,10 @@
 
     <div class="section">
       <label class="section-title">Caminho / Máscara de Download Padrão:</label>
-      <input type="text" id="default-path" class="text-input" spellcheck="false" placeholder="%USERPROFILE%\Downloads\%(title)s.%(ext)s" />
-      <span class="help-text">Tokens suportados: <code>%(title)s</code>, <code>%(ext)s</code>, <code>%(uploader)s</code></span>
+      <input type="text" id="default-path" class="text-input" spellcheck="false"
+        placeholder="%USERPROFILE%\Downloads\%(title)s.%(ext)s" />
+      <span class="help-text">Tokens suportados: <code>%(title)s</code>, <code>%(ext)s</code>,
+        <code>%(uploader)s</code></span>
     </div>
 
     <div class="save-status" id="save-status"></div>
@@ -53,6 +57,8 @@
     </footer>
   </div>
 
+  <script src="../shared/constants.js"></script>
   <script src="popup.js"></script>
 </body>
+
 </html>

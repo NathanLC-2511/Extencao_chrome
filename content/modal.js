@@ -4,32 +4,28 @@
   if (window.__ytdlpModalInitialized) return;
   window.__ytdlpModalInitialized = true;
 
-  // Formats available in yt-dlp for audio extraction
-  const AUDIO_FORMATS = [
-    { id: "mp3", name: "MP3", desc: "Mais popular (192-320 kbps)", badge: "Recomendado" },
-    { id: "m4a", name: "M4A", desc: "Excelente qualidade AAC", badge: "Apple / AAC" },
-    { id: "opus", name: "OPUS", desc: "Melhor compressão / YouTube nativo", badge: "Alta Fidelidade" },
-    { id: "flac", name: "FLAC", desc: "Sem perdas (Lossless)", badge: "Lossless" },
-    { id: "wav", name: "WAV", desc: "Sem compressão (Áudio puro)", badge: "Raw" },
-    { id: "aac", name: "AAC", desc: "Padrão de streaming", badge: "Standard" }
-  ];
+  const CONFIG = window.YTDLP_CONFIG || {
+    DEFAULT_FORMAT: "mp3",
+    DEFAULT_PATH: "%USERPROFILE%\\Downloads\\%(title)s.%(ext)s",
+    AUDIO_FORMATS: [
+      { id: "mp3", name: "MP3", desc: "Mais popular (192-320 kbps)", badge: "Recomendado" },
+      { id: "m4a", name: "M4A", desc: "Excelente qualidade AAC", badge: "Apple / AAC" },
+      { id: "opus", name: "OPUS", desc: "Melhor compressão / YouTube nativo", badge: "Alta Fidelidade" },
+      { id: "flac", name: "FLAC", desc: "Sem perdas (Lossless)", badge: "Lossless" },
+      { id: "wav", name: "WAV", desc: "Sem compressão (Áudio puro)", badge: "Raw" },
+      { id: "aac", name: "AAC", desc: "Padrão de streaming", badge: "Standard" }
+    ],
+    cleanString: (s) => (s || "").replace(/["\r\n|<>^]/g, "").trim(),
+    validateFormat: (f) => f || "mp3",
+    buildDownloadCommand: (fmt, path, url) => `yt-dlp -x --audio-format ${fmt} -o "${path}" "${url}"`,
+    buildBatContent: (fmt, path, url) => `@echo off\r\nchcp 65001 >nul\r\nyt-dlp -x --audio-format ${fmt} -o "${path}" "${url}"\r\npause\r\n`,
+    getSettings: (cb) => cb && cb({ defaultFormat: "mp3", defaultPath: "%USERPROFILE%\\Downloads\\%(title)s.%(ext)s" })
+  };
 
-  let selectedFormat = "mp3";
+  const AUDIO_FORMATS = CONFIG.AUDIO_FORMATS;
+  let selectedFormat = CONFIG.DEFAULT_FORMAT;
   let currentVideoUrl = "";
   let currentVideoTitle = "";
-
-  // Carregar preferências salvas
-  if (chrome && chrome.storage && chrome.storage.local) {
-    chrome.storage.local.get(
-      {
-        defaultFormat: "mp3",
-        defaultPath: "%USERPROFILE%\\Downloads\\%(title)s.%(ext)s"
-      },
-      (items) => {
-        if (items.defaultFormat) selectedFormat = items.defaultFormat;
-      }
-    );
-  }
 
   function getCleanShareUrl() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -37,7 +33,6 @@
     if (videoId) {
       return `https://youtu.be/${videoId}`;
     }
-    // Check for YouTube Shorts
     const matchShorts = window.location.pathname.match(/\/shorts\/([a-zA-Z0-9_-]+)/);
     if (matchShorts && matchShorts[1]) {
       return `https://youtu.be/${matchShorts[1]}`;
@@ -45,12 +40,7 @@
     return window.location.href;
   }
 
-  function getLocalDownloadTemplate() {
-    return "%USERPROFILE%\\Downloads\\%(title)s.%(ext)s";
-  }
-
   function createModalDOM() {
-    // Check if modal already exists
     let overlay = document.getElementById("ytdlp-modal-overlay");
     if (overlay) return overlay;
 
@@ -106,7 +96,7 @@
           </div>
           <div class="ytdlp-format-grid" id="ytdlp-format-grid">
             ${AUDIO_FORMATS.map(
-              (fmt) => `
+      (fmt) => `
               <div class="ytdlp-format-card ${fmt.id === selectedFormat ? "active" : ""}" data-format="${fmt.id}">
                 <div class="ytdlp-format-top">
                   <span class="ytdlp-format-name">${fmt.name}</span>
@@ -115,7 +105,7 @@
                 <div class="ytdlp-format-desc">${fmt.desc}</div>
               </div>
             `
-            ).join("")}
+    ).join("")}
           </div>
         </div>
 
@@ -183,36 +173,60 @@
 
   function getGeneratedCommand() {
     const outputPathInput = document.getElementById("ytdlp-output-path");
-    const outputPath = outputPathInput ? outputPathInput.value.trim() : getLocalDownloadTemplate();
-    const url = currentVideoUrl || getCleanShareUrl();
-    return `yt-dlp -x --audio-format ${selectedFormat} -o "${outputPath}" "${url}"`;
+    const path = outputPathInput ? outputPathInput.value : CONFIG.DEFAULT_PATH;
+    return CONFIG.buildDownloadCommand(selectedFormat, path, currentVideoUrl || getCleanShareUrl());
   }
 
   function updateCommandPreview() {
     const cmdText = document.getElementById("ytdlp-cmd-text");
     if (cmdText) {
-      cmdText.innerText = getGeneratedCommand();
+      cmdText.textContent = getGeneratedCommand();
     }
   }
 
-  function showBanner(message, type = "info") {
+  // Safe banner display avoiding innerHTML with dynamic values
+  function showBanner(content, type = "info") {
     const banner = document.getElementById("ytdlp-banner");
     const bannerText = document.getElementById("ytdlp-banner-text");
     const bannerIcon = document.getElementById("ytdlp-banner-icon");
-    if (!banner) return;
+    if (!banner || !bannerText) return;
 
     banner.className = `ytdlp-banner ytdlp-banner-${type}`;
-    bannerText.innerHTML = message;
+    bannerText.replaceChildren();
 
-    if (type === "success") {
-      bannerIcon.innerHTML = `✓`;
-    } else if (type === "error") {
-      bannerIcon.innerHTML = `✕`;
-    } else {
-      bannerIcon.innerHTML = `ℹ`;
+    if (typeof content === "string") {
+      bannerText.textContent = content;
+    } else if (content instanceof Node) {
+      bannerText.appendChild(content);
+    } else if (Array.isArray(content)) {
+      content.forEach((node) => {
+        if (typeof node === "string") {
+          bannerText.appendChild(document.createTextNode(node));
+        } else if (node instanceof Node) {
+          bannerText.appendChild(node);
+        }
+      });
+    }
+
+    if (bannerIcon) {
+      if (type === "success") bannerIcon.textContent = "✓";
+      else if (type === "error") bannerIcon.textContent = "✕";
+      else bannerIcon.textContent = "ℹ";
     }
 
     banner.style.display = "flex";
+  }
+
+  function updateActiveFormatCard(format) {
+    selectedFormat = CONFIG.validateFormat(format);
+    const cards = document.querySelectorAll(".ytdlp-format-card");
+    cards.forEach((card) => {
+      if (card.getAttribute("data-format") === selectedFormat) {
+        card.classList.add("active");
+      } else {
+        card.classList.remove("active");
+      }
+    });
   }
 
   function attachModalEvents(overlay) {
@@ -227,9 +241,8 @@
     const cards = overlay.querySelectorAll(".ytdlp-format-card");
     cards.forEach((card) => {
       card.addEventListener("click", () => {
-        cards.forEach((c) => c.classList.remove("active"));
-        card.classList.add("active");
-        selectedFormat = card.getAttribute("data-format");
+        const fmt = card.getAttribute("data-format");
+        updateActiveFormatCard(fmt);
         if (chrome && chrome.storage && chrome.storage.local) {
           chrome.storage.local.set({ defaultFormat: selectedFormat });
         }
@@ -249,7 +262,7 @@
     // Reset path button
     const resetBtn = overlay.querySelector("#ytdlp-reset-path");
     resetBtn.addEventListener("click", () => {
-      pathInput.value = getLocalDownloadTemplate();
+      pathInput.value = CONFIG.DEFAULT_PATH;
       if (chrome && chrome.storage && chrome.storage.local) {
         chrome.storage.local.set({ defaultPath: pathInput.value.trim() });
       }
@@ -278,26 +291,38 @@
     // Download .bat button
     const downloadBatBtn = overlay.querySelector("#ytdlp-download-bat-btn");
     downloadBatBtn.addEventListener("click", () => {
-      const cmd = getGeneratedCommand();
-      const batContent = `@echo off\r\nchcp 65001 >nul\r\ntitle yt-dlp Downloader\r\necho Baixando audio com yt-dlp...\r\necho Executando: ${cmd}\r\n${cmd}\r\necho.\r\npause\r\n`;
+      const pathInput = overlay.querySelector("#ytdlp-output-path");
+      const outputPath = pathInput ? pathInput.value : CONFIG.DEFAULT_PATH;
+      const safeUrl = currentVideoUrl || getCleanShareUrl();
+      const safeFormat = CONFIG.validateFormat(selectedFormat);
+      const batContent = CONFIG.buildBatContent(safeFormat, outputPath, safeUrl);
+
       const blob = new Blob([batContent], { type: "text/plain;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `download_${selectedFormat}.bat`;
+      a.download = `download_${safeFormat}.bat`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      showBanner("Arquivo script <code>download_" + selectedFormat + ".bat</code> baixado com sucesso!", "success");
+
+      const frag = document.createDocumentFragment();
+      frag.appendChild(document.createTextNode("Arquivo script "));
+      const code = document.createElement("code");
+      code.textContent = `download_${safeFormat}.bat`;
+      frag.appendChild(code);
+      frag.appendChild(document.createTextNode(" baixado com sucesso!"));
+      showBanner(frag, "success");
     });
 
     // Execute button (Native Messaging Host)
     const runBtn = overlay.querySelector("#ytdlp-run-btn");
     runBtn.addEventListener("click", () => {
-      const cmd = getGeneratedCommand();
       const pathInput = overlay.querySelector("#ytdlp-output-path");
-      const outputPath = pathInput ? pathInput.value.trim() : "";
+      const outputPath = pathInput ? CONFIG.cleanString(pathInput.value) : CONFIG.DEFAULT_PATH;
+      const safeFormat = CONFIG.validateFormat(selectedFormat);
+      const safeUrl = CONFIG.cleanString(currentVideoUrl || getCleanShareUrl());
 
       showBanner("Disparando comando no Windows via conector nativo...", "info");
       runBtn.disabled = true;
@@ -305,21 +330,40 @@
       chrome.runtime.sendMessage(
         {
           action: "EXECUTE_YTDLP",
-          url: currentVideoUrl,
-          format: selectedFormat,
+          url: safeUrl,
+          format: safeFormat,
           outputPath: outputPath
         },
         (response) => {
           runBtn.disabled = false;
           if (chrome.runtime.lastError || !response || !response.success) {
-            const errorMsg = (response && response.error) || (chrome.runtime.lastError && chrome.runtime.lastError.message) || "Erro desconhecido ao conectar com o conector nativo.";
-            showBanner(
-              `<strong>Não foi possível executar automaticamente:</strong> ${errorMsg}<br><br>` +
-              `💡 <em>Dica: execute o script <code>install_host.bat</code> na pasta da extensão para registrar o conector, ou use o botão <strong>Copiar Comando</strong> ao lado!</em>`,
-              "error"
-            );
+            const errorMsg =
+              (response && response.error) ||
+              (chrome.runtime.lastError && chrome.runtime.lastError.message) ||
+              "Erro desconhecido ao conectar com o conector nativo.";
+
+            const frag = document.createDocumentFragment();
+            const strong = document.createElement("strong");
+            strong.textContent = "Não foi possível executar automaticamente: ";
+            frag.appendChild(strong);
+            frag.appendChild(document.createTextNode(errorMsg));
+            frag.appendChild(document.createElement("br"));
+            frag.appendChild(document.createElement("br"));
+            const hint = document.createElement("span");
+            hint.innerHTML =
+              '💡 <em>Dica: execute o script <code>install_host.bat</code> na pasta da extensão para registrar o conector, ou use o botão <strong>Copiar Comando</strong> ao lado!</em>';
+            frag.appendChild(hint);
+            showBanner(frag, "error");
           } else {
-            showBanner(`🚀 <strong>${response.data.message || "Download iniciado com sucesso!"}</strong> Uma janela do terminal foi aberta para acompanhar o progresso em tempo real.`, "success");
+            const frag = document.createDocumentFragment();
+            frag.appendChild(document.createTextNode("🚀 "));
+            const strong = document.createElement("strong");
+            strong.textContent = (response && response.data && response.data.message) || "Download iniciado com sucesso!";
+            frag.appendChild(strong);
+            frag.appendChild(
+              document.createTextNode(" Uma janela do terminal foi aberta para acompanhar o progresso em tempo real.")
+            );
+            showBanner(frag, "success");
           }
         }
       );
@@ -327,39 +371,51 @@
   }
 
   function openModal(shareUrl, videoTitle) {
-    const overlay = createModalDOM();
-    currentVideoUrl = shareUrl || getCleanShareUrl();
-    currentVideoTitle = videoTitle || document.title.replace(" - YouTube", "") || "Vídeo do YouTube";
+    // Carregar todas as preferências antes de exibir a interface
+    CONFIG.getSettings((settings) => {
+      const overlay = createModalDOM();
+      currentVideoUrl = CONFIG.cleanString(shareUrl || getCleanShareUrl());
+      currentVideoTitle = videoTitle || document.title.replace(" - YouTube", "") || "Vídeo do YouTube";
 
-    // Update fields
-    const titleEl = overlay.querySelector("#ytdlp-video-title");
-    if (titleEl) titleEl.innerText = currentVideoTitle;
+      // Aplicar formato e caminho salvos
+      updateActiveFormatCard(settings.defaultFormat);
 
-    const urlInput = overlay.querySelector("#ytdlp-share-url-input");
-    if (urlInput) urlInput.value = currentVideoUrl;
+      const titleEl = overlay.querySelector("#ytdlp-video-title");
+      if (titleEl) titleEl.textContent = currentVideoTitle;
 
-    const pathInput = overlay.querySelector("#ytdlp-output-path");
-    if (pathInput && !pathInput.value) {
-      pathInput.value = getLocalDownloadTemplate();
-    }
+      const urlInput = overlay.querySelector("#ytdlp-share-url-input");
+      if (urlInput) urlInput.value = currentVideoUrl;
 
-    const banner = overlay.querySelector("#ytdlp-banner");
-    if (banner) banner.style.display = "none";
-
-    updateCommandPreview();
-
-    // Copy the share URL to clipboard as requested:
-    // "quando eu apertar o botão você deve ir em compartilhar e copiar a URL de envio."
-    navigator.clipboard.writeText(currentVideoUrl).then(
-      () => {
-        showBanner(`URL de envio (<strong>${currentVideoUrl}</strong>) copiada automaticamente para a área de transferência! Escolha o formato abaixo:`, "info");
-      },
-      () => {
-        // Clipboard write denied or not focused
+      const pathInput = overlay.querySelector("#ytdlp-output-path");
+      if (pathInput) {
+        pathInput.value = settings.defaultPath || CONFIG.DEFAULT_PATH;
       }
-    );
 
-    overlay.classList.add("ytdlp-active");
+      const banner = overlay.querySelector("#ytdlp-banner");
+      if (banner) banner.style.display = "none";
+
+      updateCommandPreview();
+
+      // Copiar a URL de envio para a área de transferência
+      navigator.clipboard.writeText(currentVideoUrl).then(
+        () => {
+          const frag = document.createDocumentFragment();
+          frag.appendChild(document.createTextNode("URL de envio ("));
+          const strong = document.createElement("strong");
+          strong.textContent = currentVideoUrl;
+          frag.appendChild(strong);
+          frag.appendChild(
+            document.createTextNode(") copiada automaticamente para a área de transferência! Escolha o formato abaixo:")
+          );
+          showBanner(frag, "info");
+        },
+        () => {
+          // Clipboard write denied or not focused
+        }
+      );
+
+      overlay.classList.add("ytdlp-active");
+    });
   }
 
   function closeModal() {

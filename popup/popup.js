@@ -9,22 +9,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusDesc = document.getElementById("status-desc");
 
   // Load saved preferences
-  chrome.storage.local.get(
-    {
-      defaultFormat: "mp3",
-      defaultPath: "%USERPROFILE%\\Downloads\\%(title)s.%(ext)s"
-    },
-    (items) => {
-      formatSelect.value = items.defaultFormat || "mp3";
-      pathInput.value = items.defaultPath || "%USERPROFILE%\\Downloads\\%(title)s.%(ext)s";
-    }
-  );
+  YTDLP_CONFIG.getSettings((items) => {
+    formatSelect.value = items.defaultFormat;
+    pathInput.value = items.defaultPath;
+  });
 
   // Save preferences
   saveBtn.addEventListener("click", () => {
     const settings = {
-      defaultFormat: formatSelect.value,
-      defaultPath: pathInput.value.trim()
+      defaultFormat: YTDLP_CONFIG.validateFormat(formatSelect.value),
+      defaultPath: YTDLP_CONFIG.cleanString(pathInput.value) || YTDLP_CONFIG.DEFAULT_PATH
     };
 
     chrome.storage.local.set(settings, () => {
@@ -39,20 +33,24 @@ document.addEventListener("DOMContentLoaded", () => {
   function testNativeHost() {
     statusDot.className = "status-indicator";
     statusTitle.innerText = "Verificando...";
-    statusDesc.innerText = "Tentando conectar ao com.ytdlp.downloader...";
+    statusDesc.innerText = "Tentando conectar ao " + YTDLP_CONFIG.NATIVE_HOST_NAME + "...";
 
     chrome.runtime.sendNativeMessage(
-      "com.ytdlp.downloader",
+      YTDLP_CONFIG.NATIVE_HOST_NAME,
       { action: "test" },
       (response) => {
         if (chrome.runtime.lastError) {
           statusDot.className = "status-indicator offline";
           statusTitle.innerText = "Conector Não Conectado";
           statusDesc.innerText = "Execute 'install_host.bat' na pasta da extensão.";
+        } else if (!response || response.status === "error") {
+          statusDot.className = "status-indicator offline";
+          statusTitle.innerText = "Erro no Conector";
+          statusDesc.innerText = (response && response.message) || "yt-dlp não encontrado ou erro no conector.";
         } else {
           statusDot.className = "status-indicator online";
           statusTitle.innerText = "Conector Ativo";
-          statusDesc.innerText = "Pronto para disparar yt-dlp diretamente!";
+          statusDesc.innerText = response.message || "Pronto para disparar yt-dlp diretamente!";
         }
       }
     );

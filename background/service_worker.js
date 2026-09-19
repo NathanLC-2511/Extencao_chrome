@@ -1,4 +1,6 @@
-const NATIVE_HOST_NAME = "com.ytdlp.downloader";
+importScripts("../shared/constants.js");
+
+const NATIVE_HOST_NAME = YTDLP_CONFIG.NATIVE_HOST_NAME;
 
 // Listen for messages from content scripts and popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
@@ -11,8 +13,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         {
           action: "download",
           url: url,
-          format: format || "mp3",
-          outputPath: outputPath || ""
+          format: YTDLP_CONFIG.validateFormat(format),
+          outputPath: outputPath || YTDLP_CONFIG.DEFAULT_PATH
         },
         (response) => {
           if (chrome.runtime.lastError) {
@@ -21,6 +23,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               success: false,
               error: chrome.runtime.lastError.message,
               isNativeHostMissing: true
+            });
+          } else if (response && response.status === "error") {
+            console.error("[yt-dlp] Native host reported error:", response.message);
+            sendResponse({
+              success: false,
+              error: response.message || "Erro retornado pelo conector nativo.",
+              data: response
             });
           } else {
             console.log("[yt-dlp] Native host response:", response);
@@ -44,15 +53,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 
   if (request.action === "GET_SETTINGS") {
-    chrome.storage.local.get(
-      {
-        defaultFormat: "mp3",
-        defaultPath: "%(USERPROFILE)s\\Downloads\\%(title)s.%(ext)s"
-      },
-      (items) => {
-        sendResponse(items);
-      }
-    );
+    YTDLP_CONFIG.getSettings((items) => {
+      sendResponse(items);
+    });
     return true;
   }
 
