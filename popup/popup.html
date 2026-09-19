@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>yt-dlp Downloader</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="popup-container">
+    <header class="popup-header">
+      <div class="header-logo">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+          <path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+        </svg>
+      </div>
+      <div>
+        <h2>yt-dlp Downloader</h2>
+        <span class="version-tag">v1.0.0</span>
+      </div>
+    </header>
+
+    <div class="status-card" id="status-card">
+      <div class="status-indicator" id="status-dot"></div>
+      <div class="status-info">
+        <span class="status-title" id="status-title">Conector Nativo</span>
+        <span class="status-desc" id="status-desc">Verificando comunicação...</span>
+      </div>
+      <button class="test-btn" id="check-host-btn" title="Testar conexão">Testar</button>
+    </div>
+
+    <div class="section">
+      <label class="section-title">Formato de Áudio Padrão:</label>
+      <select id="default-format" class="select-input">
+        <option value="mp3">MP3 (Padrão / Recomendado)</option>
+        <option value="m4a">M4A (Apple AAC)</option>
+        <option value="opus">OPUS (Alta Fidelidade)</option>
+        <option value="flac">FLAC (Lossless / Sem Perdas)</option>
+        <option value="wav">WAV (Raw / Não comprimido)</option>
+        <option value="aac">AAC (Standard)</option>
+      </select>
+    </div>
+
+    <div class="section">
+      <label class="section-title">Caminho / Máscara de Download Padrão:</label>
+      <input type="text" id="default-path" class="text-input" spellcheck="false" placeholder="%USERPROFILE%\Downloads\%(title)s.%(ext)s" />
+      <span class="help-text">Tokens suportados: <code>%(title)s</code>, <code>%(ext)s</code>, <code>%(uploader)s</code></span>
+    </div>
+
+    <div class="save-status" id="save-status"></div>
+
+    <footer class="popup-footer">
+      <button class="save-btn" id="save-btn">Salvar Preferências</button>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
