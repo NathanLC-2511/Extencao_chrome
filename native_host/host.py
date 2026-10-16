@@ -47,7 +47,10 @@ def send_message(msg):
 
 
 def find_tool(name):
-    """Locates an executable in PATH."""
+    """Locates an executable in PATH, prioritizing ~/.local/bin."""
+    user_local = os.path.expanduser(f"~/.local/bin/{name}")
+    if os.path.isfile(user_local) and os.access(user_local, os.X_OK):
+        return user_local
     return shutil.which(name)
 
 
@@ -75,30 +78,49 @@ def launch_in_terminal(script_path):
     Falls back to running detached in the background if no emulator is found.
     """
     terminal_candidates = [
-        ("x-terminal-emulator", ["x-terminal-emulator", "-e", script_path]),
-        ("gnome-terminal", ["gnome-terminal", "--", script_path]),
-        ("konsole", ["konsole", "-e", script_path]),
-        ("xfce4-terminal", ["xfce4-terminal", "-x", script_path]),
-        ("mate-terminal", ["mate-terminal", "-e", script_path]),
-        ("lxterminal", ["lxterminal", "-e", script_path]),
-        ("kitty", ["kitty", script_path]),
-        ("alacritty", ["alacritty", "-e", script_path]),
-        ("foot", ["foot", script_path]),
-        ("terminator", ["terminator", "-x", script_path]),
-        ("xterm", ["xterm", "-e", script_path]),
+        ("gnome-terminal", ["gnome-terminal", "--", "bash", script_path]),
+        ("ptyxis", ["ptyxis", "--", "bash", script_path]),
+        ("konsole", ["konsole", "-e", "bash", script_path]),
+        ("xfce4-terminal", ["xfce4-terminal", "-x", "bash", script_path]),
+        ("mate-terminal", ["mate-terminal", "-e", f"bash {script_path}"]),
+        ("lxterminal", ["lxterminal", "-e", f"bash {script_path}"]),
+        ("kitty", ["kitty", "bash", script_path]),
+        ("alacritty", ["alacritty", "-e", "bash", script_path]),
+        ("foot", ["foot", "bash", script_path]),
+        ("terminator", ["terminator", "-x", f"bash {script_path}"]),
+        ("x-terminal-emulator", ["x-terminal-emulator", "-e", f"bash {script_path}"]),
+        ("xterm", ["xterm", "-e", "bash", script_path]),
     ]
 
+    env = os.environ.copy()
+    if "DISPLAY" not in env and "WAYLAND_DISPLAY" not in env:
+        env["DISPLAY"] = ":0"
+
     for name, cmd in terminal_candidates:
-        if find_tool(name):
+        if shutil.which(name):
             try:
-                subprocess.Popen(cmd, start_new_session=True)
+                subprocess.Popen(
+                    cmd,
+                    start_new_session=True,
+                    stdin=subprocess.DEVNULL,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    env=env
+                )
                 return True, name
             except Exception:
                 continue
 
     # Fallback to direct background execution
     try:
-        subprocess.Popen([script_path], start_new_session=True)
+        subprocess.Popen(
+            ["bash", script_path],
+            start_new_session=True,
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            env=env
+        )
         return False, "background"
     except Exception as e:
         return False, str(e)
@@ -185,13 +207,13 @@ def main():
     # Generate temporary runner shell script
     script_content = f"""#!/usr/bin/env bash
 # yt-dlp temporary runner script
-clear
+clear 2>/dev/null || true
 echo "========================================================"
 echo "  🎵 yt-dlp Audio Downloader (Linux)"
 echo "========================================================"
-echo "URL:     \"{url}\""
-echo "Formato: \"{fmt}\""
-echo "Destino: \"{output_path}\""
+echo 'URL:     {url}'
+echo 'Formato: {fmt}'
+echo 'Destino: {output_path}'
 echo ""
 echo "Iniciando download e extração de áudio..."
 echo "========================================================"

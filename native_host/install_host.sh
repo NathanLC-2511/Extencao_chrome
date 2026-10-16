@@ -129,6 +129,25 @@ if command -v flatpak >/dev/null 2>&1; then
     done
 fi
 
+# Verificar versão do yt-dlp e atualizar se necessário
+echo ""
+echo "Verificando versão do yt-dlp..."
+CURRENT_YTDLP_VER=""
+if command -v yt-dlp >/dev/null 2>&1; then
+    CURRENT_YTDLP_VER=$(yt-dlp --version 2>/dev/null || true)
+fi
+
+if [ -z "$CURRENT_YTDLP_VER" ] || [[ "$CURRENT_YTDLP_VER" =~ ^202[0-4]\. ]]; then
+    echo -e "  ${YELLOW}⚠ Versão desatualizada ou ausente do yt-dlp detectada ($CURRENT_YTDLP_VER).${NC}"
+    echo -e "  ${BLUE}Baixando a versão oficial mais recente para ~/.local/bin/yt-dlp...${NC}"
+    mkdir -p "$HOME/.local/bin"
+    curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o "$HOME/.local/bin/yt-dlp" && chmod a+rx "$HOME/.local/bin/yt-dlp"
+    NEW_VER=$("$HOME/.local/bin/yt-dlp" --version 2>/dev/null || true)
+    echo -e "  ${GREEN}✓ yt-dlp atualizado para a versão $NEW_VER em ~/.local/bin/yt-dlp!${NC}"
+else
+    echo -e "  ${GREEN}✓ yt-dlp atualizado e pronto (versão $CURRENT_YTDLP_VER).${NC}"
+fi
+
 echo ""
 echo -e "${GREEN}======================================================================${NC}"
 echo -e "${GREEN}🎉 [SUCESSO] Conector nativo instalado com êxito!${NC}"
