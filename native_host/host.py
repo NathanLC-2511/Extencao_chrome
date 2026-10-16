@@ -1,19 +1,19 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
 yt-dlp Downloader Native Messaging Host for Linux & POSIX systems.
 Communicates with Google Chrome / Chromium / Brave via stdio binary protocol.
 """
 
-import sys
-import os
+import contextlib
 import json
-import struct
-import shutil
-import subprocess
+import os
 import re
-import tempfile
+import shutil
 import stat
+import struct
+import subprocess
+import sys
+import tempfile
 import time
 
 ALLOWED_FORMATS = ("mp3", "m4a", "opus", "flac", "wav", "aac")
@@ -34,7 +34,7 @@ def read_message():
 
     try:
         return json.loads(raw_data.decode("utf-8"))
-    except Exception:
+    except (json.JSONDecodeError, UnicodeDecodeError):
         return None
 
 
@@ -58,18 +58,13 @@ def clean_old_temp_scripts():
     """Removes temporary scripts older than 10 minutes to avoid clutter."""
     temp_dir = tempfile.gettempdir()
     now = time.time()
-    try:
+    with contextlib.suppress(OSError):
         for entry in os.listdir(temp_dir):
             if entry.startswith("ytdlp_download_") and entry.endswith(".sh"):
                 full_path = os.path.join(temp_dir, entry)
-                if os.path.isfile(full_path):
-                    if now - os.path.getctime(full_path) > 600:
-                        try:
-                            os.remove(full_path)
-                        except OSError:
-                            pass
-    except Exception:
-        pass
+                if os.path.isfile(full_path) and (now - os.path.getctime(full_path) > 600):
+                    with contextlib.suppress(OSError):
+                        os.remove(full_path)
 
 
 def launch_in_terminal(script_path):
@@ -105,10 +100,10 @@ def launch_in_terminal(script_path):
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
-                    env=env
+                    env=env,
                 )
                 return True, name
-            except Exception:
+            except OSError:
                 continue
 
     # Fallback to direct background execution
@@ -119,10 +114,10 @@ def launch_in_terminal(script_path):
             stdin=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
-            env=env
+            env=env,
         )
         return False, "background"
-    except Exception as e:
+    except OSError as e:
         return False, str(e)
 
 
@@ -258,8 +253,8 @@ rm -f -- "$0"
 if __name__ == "__main__":
     try:
         main()
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001
         send_message({
             "status": "error",
-            "message": str(exc)
+            "message": str(exc),
         })
