@@ -9,6 +9,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusDesc = document.getElementById("status-desc");
 
   // Load saved preferences
+  pathInput.placeholder = YTDLP_CONFIG.DEFAULT_PATH;
   YTDLP_CONFIG.getSettings((items) => {
     formatSelect.value = items.defaultFormat;
     pathInput.value = items.defaultPath;
@@ -40,9 +41,10 @@ document.addEventListener("DOMContentLoaded", () => {
       { action: "test" },
       (response) => {
         if (chrome.runtime.lastError) {
+          const scriptName = YTDLP_CONFIG.getInstallScriptName ? YTDLP_CONFIG.getInstallScriptName() : "install_host";
           statusDot.className = "status-indicator offline";
           statusTitle.innerText = "Conector Não Conectado";
-          statusDesc.innerText = "Execute 'install_host.bat' na pasta da extensão.";
+          statusDesc.innerText = `Execute '${scriptName}' na pasta native_host.`;
         } else if (!response || response.status === "error") {
           statusDot.className = "status-indicator offline";
           statusTitle.innerText = "Erro no Conector";

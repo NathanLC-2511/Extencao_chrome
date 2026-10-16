@@ -1,7 +1,7 @@
 {
   "name": "com.ytdlp.downloader",
   "description": "yt-dlp Downloader Native Messaging Host",
-  "path": "<CAMINHO_ABSOLUTO_PARA_HOST.BAT>",
+  "path": "<CAMINHO_ABSOLUTO_PARA_HOST.BAT_NO_WINDOWS_OU_HOST.SH_NO_LINUX>",
   "type": "stdio",
   "allowed_origins": [
     "chrome-extension://<ID_DA_EXTENSAO>/"

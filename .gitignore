@@ -14,6 +14,10 @@ Desktop.ini
 *.tmp
 *.bak
 ytdlp_download_*.bat
+ytdlp_download_*.sh
+__pycache__/
+*.py[cod]
 
-# Manifesto do conector nativo gerado pelo install_host.bat
+# Manifesto do conector nativo gerado pelo instalador
 native_host/com.ytdlp.downloader.json
+

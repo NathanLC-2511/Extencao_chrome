@@ -5,12 +5,20 @@
   const SHARE_QUICK_BTN_ID = "ytdlp-share-dialog-quick-btn";
   const SHARE_TARGET_ITEM_ID = "ytdlp-share-target-item";
 
+  const isLinux = typeof navigator !== "undefined" && (
+    (navigator.userAgentData && navigator.userAgentData.platform === "Linux") ||
+    (navigator.platform && navigator.platform.toLowerCase().includes("linux")) ||
+    (navigator.userAgent && navigator.userAgent.toLowerCase().includes("linux"))
+  );
+
   const CONFIG = window.YTDLP_CONFIG || {
     DEFAULT_FORMAT: "mp3",
-    DEFAULT_PATH: "%USERPROFILE%\\Downloads\\%(title)s.%(ext)s",
+    DEFAULT_PATH: isLinux ? "~/Downloads/%(title)s.%(ext)s" : "%USERPROFILE%\\Downloads\\%(title)s.%(ext)s",
+    isLinux: () => isLinux,
+    getInstallScriptName: () => (isLinux ? "./install_host.sh" : "install_host.bat"),
     validateFormat: (f) => f || "mp3",
     cleanString: (s) => (s || "").replace(/["\r\n|<>^]/g, "").trim(),
-    getSettings: (cb) => cb && cb({ defaultFormat: "mp3", defaultPath: "%USERPROFILE%\\Downloads\\%(title)s.%(ext)s" })
+    getSettings: (cb) => cb && cb({ defaultFormat: "mp3", defaultPath: isLinux ? "~/Downloads/%(title)s.%(ext)s" : "%USERPROFILE%\\Downloads\\%(title)s.%(ext)s" })
   };
 
   function isWatchPage() {
@@ -143,8 +151,8 @@
               (response && response.error) ||
               (chrome.runtime.lastError && chrome.runtime.lastError.message) ||
               "Erro ao conectar com o conector nativo.";
-            labelEl.textContent = "✕ Falha";
-            alert(`[yt-dlp] Não foi possível executar: ${errorMsg}\n\nExecute 'install_host.bat' para ativar o conector nativo.`);
+            const scriptName = CONFIG.getInstallScriptName ? CONFIG.getInstallScriptName() : (isLinux ? "./install_host.sh" : "install_host.bat");
+            alert(`[yt-dlp] Não foi possível executar: ${errorMsg}\n\nExecute '${scriptName}' na pasta native_host para ativar o conector nativo.`);
             setTimeout(() => {
               labelEl.textContent = originalText;
             }, 3000);
