@@ -20,10 +20,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 JSON_LOCAL="$SCRIPT_DIR/com.ytdlp.downloader.json"
 
 TARGET_DIRS=(
+    # --- Navegadores Nativos ---
     "$HOME/.config/google-chrome/NativeMessagingHosts"
     "$HOME/.config/chromium/NativeMessagingHosts"
     "$HOME/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
     "$HOME/.config/microsoft-edge/NativeMessagingHosts"
+
+    # --- Navegadores Flatpak ---
+    "$HOME/.var/app/com.google.Chrome/config/google-chrome/NativeMessagingHosts"
+    "$HOME/.var/app/org.chromium.Chromium/config/chromium/NativeMessagingHosts"
+    "$HOME/.var/app/com.brave.Browser/config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
+    "$HOME/.var/app/com.microsoft.Edge/config/microsoft-edge/NativeMessagingHosts"
+
+    # --- Navegadores Snap ---
+    "$HOME/snap/chromium/current/.config/chromium/NativeMessagingHosts"
+    "$HOME/snap/brave/current/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
 )
 
 REMOVED_COUNT=0
@@ -45,7 +56,7 @@ fi
 echo ""
 echo -e "${GREEN}======================================================================${NC}"
 if [ $REMOVED_COUNT -gt 0 ]; then
-    echo -e "${GREEN}[SUCESSO] Conector nativo removido com sucesso de $REMOVED_COUNT navegador(es)!${NC}"
+    echo -e "${GREEN}[SUCESSO] Conector nativo removido com sucesso de $REMOVED_COUNT navegador(es)/ambiente(s)!${NC}"
 else
     echo -e "${YELLOW}[INFO] Nenhum manifesto de conector foi encontrado para remover.${NC}"
 fi

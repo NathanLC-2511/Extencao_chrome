@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Instalador do Conector Nativo yt-dlp para Linux (Google Chrome, Chromium, Brave, Edge)
+# Instalador do Conector Nativo yt-dlp para Linux
+# Suporte a navegadores Nativos (.deb/.rpm/tar), Flatpak e Snap
 # ==============================================================================
 
 set -e
@@ -14,7 +15,7 @@ NC='\033[0m' # Sem cor
 
 clear 2>/dev/null || true
 echo -e "${BLUE}======================================================================${NC}"
-echo -e "${BLUE}      Instalador do Conector Nativo yt-dlp para Linux (Chrome)        ${NC}"
+echo -e "${BLUE}      Instalador do Conector Nativo yt-dlp para Linux                 ${NC}"
 echo -e "${BLUE}======================================================================${NC}"
 echo ""
 
@@ -82,22 +83,33 @@ EOF
 
 chmod 644 "$JSON_LOCAL"
 
-# Diretórios padrão de NativeMessagingHosts no Linux
+# Diretórios padrão de NativeMessagingHosts no Linux (Nativo, Flatpak e Snap)
 TARGET_DIRS=(
+    # --- Navegadores Nativos (.deb, .rpm, pacman, etc.) ---
     "$HOME/.config/google-chrome/NativeMessagingHosts"
     "$HOME/.config/chromium/NativeMessagingHosts"
     "$HOME/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
     "$HOME/.config/microsoft-edge/NativeMessagingHosts"
+
+    # --- Navegadores Flatpak ---
+    "$HOME/.var/app/com.google.Chrome/config/google-chrome/NativeMessagingHosts"
+    "$HOME/.var/app/org.chromium.Chromium/config/chromium/NativeMessagingHosts"
+    "$HOME/.var/app/com.brave.Browser/config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
+    "$HOME/.var/app/com.microsoft.Edge/config/microsoft-edge/NativeMessagingHosts"
+
+    # --- Navegadores Snap ---
+    "$HOME/snap/chromium/current/.config/chromium/NativeMessagingHosts"
+    "$HOME/snap/brave/current/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
 )
 
 echo ""
-echo "Instalando manifesto nos navegadores suportados..."
+echo "Instalando manifesto nos navegadores instalados no sistema..."
 
 INSTALLED_COUNT=0
 
 for DIR in "${TARGET_DIRS[@]}"; do
     PARENT_DIR="$(dirname "$DIR")"
-    # Se o diretório do navegador existir ou for Chrome/Chromium padrão, instalamos
+    # Registra se o diretório do navegador já existir ou se for os caminhos padrão do Chrome/Chromium
     if [ -d "$PARENT_DIR" ] || [[ "$DIR" == *"google-chrome"* ]] || [[ "$DIR" == *"chromium"* ]]; then
         mkdir -p "$DIR"
         cp -f "$JSON_LOCAL" "$DIR/com.ytdlp.downloader.json"
@@ -105,6 +117,17 @@ for DIR in "${TARGET_DIRS[@]}"; do
         INSTALLED_COUNT=$((INSTALLED_COUNT + 1))
     fi
 done
+
+# Configurar permissões de Flatpak caso navegadores Flatpak estejam instalados
+if command -v flatpak >/dev/null 2>&1; then
+    FLATPAK_APPS=("com.google.Chrome" "org.chromium.Chromium" "com.brave.Browser" "com.microsoft.Edge")
+    for APP in "${FLATPAK_APPS[@]}"; do
+        if flatpak info "$APP" >/dev/null 2>&1; then
+            echo -e "  ${BLUE}ℹ Configurando permissões do Flatpak para ${YELLOW}$APP${NC}..."
+            flatpak override --user --talk-name=org.freedesktop.Flatpak "$APP" 2>/dev/null || true
+        fi
+    done
+fi
 
 echo ""
 echo -e "${GREEN}======================================================================${NC}"
@@ -114,7 +137,8 @@ echo -e "Executável host: ${YELLOW}$HOST_EXEC${NC}"
 echo -e "Navegadores configurados: ${GREEN}$INSTALLED_COUNT${NC}"
 echo ""
 echo "Para verificar:"
-echo "1. Clique no ícone da extensão no Chrome/Brave/Edge."
-echo "2. O status exibirá 'Conector Ativo' (círculo verde)."
+echo "1. Se o navegador já estava aberto, feche-o e reabra (necessário no Flatpak)."
+echo "2. Clique no ícone da extensão no Chrome/Brave/Edge."
+echo "3. O status exibirá 'Conector Ativo' (círculo verde)."
 echo -e "${GREEN}======================================================================${NC}"
 echo ""
