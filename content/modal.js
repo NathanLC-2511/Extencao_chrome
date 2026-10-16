@@ -4,9 +4,19 @@
   if (window.__ytdlpModalInitialized) return;
   window.__ytdlpModalInitialized = true;
 
+  const isLinux = typeof navigator !== "undefined" && (
+    (navigator.userAgentData && navigator.userAgentData.platform === "Linux") ||
+    (navigator.platform && navigator.platform.toLowerCase().includes("linux")) ||
+    (navigator.userAgent && navigator.userAgent.toLowerCase().includes("linux"))
+  );
+
   const CONFIG = window.YTDLP_CONFIG || {
     DEFAULT_FORMAT: "mp3",
-    DEFAULT_PATH: "%USERPROFILE%\\Downloads\\%(title)s.%(ext)s",
+    DEFAULT_PATH: isLinux ? "~/Downloads/%(title)s.%(ext)s" : "%USERPROFILE%\\Downloads\\%(title)s.%(ext)s",
+    isLinux: () => isLinux,
+    getInstallScriptName: () => (isLinux ? "./install_host.sh" : "install_host.bat"),
+    getScriptLabel: () => (isLinux ? "Baixar .sh" : "Baixar .bat"),
+    getScriptFileName: (f) => (isLinux ? `download_${f || "mp3"}.sh` : `download_${f || "mp3"}.bat`),
     AUDIO_FORMATS: [
       { id: "mp3", name: "MP3", desc: "Mais popular (192-320 kbps)", badge: "Recomendado" },
       { id: "m4a", name: "M4A", desc: "Excelente qualidade AAC", badge: "Apple / AAC" },
@@ -19,7 +29,8 @@
     validateFormat: (f) => f || "mp3",
     buildDownloadCommand: (fmt, path, url) => `yt-dlp -x --audio-format ${fmt} -o "${path}" "${url}"`,
     buildBatContent: (fmt, path, url) => `@echo off\r\nchcp 65001 >nul\r\nyt-dlp -x --audio-format ${fmt} -o "${path}" "${url}"\r\npause\r\n`,
-    getSettings: (cb) => cb && cb({ defaultFormat: "mp3", defaultPath: "%USERPROFILE%\\Downloads\\%(title)s.%(ext)s" })
+    buildScriptContent: (fmt, path, url) => (isLinux ? `#!/usr/bin/env bash\nyt-dlp -x --audio-format ${fmt} -o "${path}" "${url}"\n` : `@echo off\r\nchcp 65001 >nul\r\nyt-dlp -x --audio-format ${fmt} -o "${path}" "${url}"\r\npause\r\n`),
+    getSettings: (cb) => cb && cb({ defaultFormat: "mp3", defaultPath: isLinux ? "~/Downloads/%(title)s.%(ext)s" : "%USERPROFILE%\\Downloads\\%(title)s.%(ext)s" })
   };
 
   const AUDIO_FORMATS = CONFIG.AUDIO_FORMATS;
@@ -160,7 +171,7 @@
               <polyline points="7 10 12 15 17 10"></polyline>
               <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
-            <span>Baixar .bat</span>
+            <span id="ytdlp-download-script-label">${CONFIG.getScriptLabel ? CONFIG.getScriptLabel() : "Baixar Script"}</span>
           </button>
         </div>
       </div>
@@ -288,20 +299,23 @@
       });
     });
 
-    // Download .bat button
+    // Download script button (.sh on Linux, .bat on Windows)
     const downloadBatBtn = overlay.querySelector("#ytdlp-download-bat-btn");
     downloadBatBtn.addEventListener("click", () => {
       const pathInput = overlay.querySelector("#ytdlp-output-path");
       const outputPath = pathInput ? pathInput.value : CONFIG.DEFAULT_PATH;
       const safeUrl = currentVideoUrl || getCleanShareUrl();
       const safeFormat = CONFIG.validateFormat(selectedFormat);
-      const batContent = CONFIG.buildBatContent(safeFormat, outputPath, safeUrl);
+      const isLinuxEnv = CONFIG.isLinux ? CONFIG.isLinux() : isLinux;
+      const scriptFileName = CONFIG.getScriptFileName ? CONFIG.getScriptFileName(safeFormat) : (isLinuxEnv ? `download_${safeFormat}.sh` : `download_${safeFormat}.bat`);
+      const scriptContent = CONFIG.buildScriptContent ? CONFIG.buildScriptContent(safeFormat, outputPath, safeUrl) : CONFIG.buildBatContent(safeFormat, outputPath, safeUrl);
 
-      const blob = new Blob([batContent], { type: "text/plain;charset=utf-8" });
+      const mimeType = isLinuxEnv ? "application/x-sh;charset=utf-8" : "text/plain;charset=utf-8";
+      const blob = new Blob([scriptContent], { type: mimeType });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `download_${safeFormat}.bat`;
+      a.download = scriptFileName;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -310,7 +324,7 @@
       const frag = document.createDocumentFragment();
       frag.appendChild(document.createTextNode("Arquivo script "));
       const code = document.createElement("code");
-      code.textContent = `download_${safeFormat}.bat`;
+      code.textContent = scriptFileName;
       frag.appendChild(code);
       frag.appendChild(document.createTextNode(" baixado com sucesso!"));
       showBanner(frag, "success");
@@ -324,7 +338,7 @@
       const safeFormat = CONFIG.validateFormat(selectedFormat);
       const safeUrl = CONFIG.cleanString(currentVideoUrl || getCleanShareUrl());
 
-      showBanner("Disparando comando no Windows via conector nativo...", "info");
+      showBanner("Disparando comando via conector nativo...", "info");
       runBtn.disabled = true;
 
       chrome.runtime.sendMessage(
@@ -342,6 +356,7 @@
               (chrome.runtime.lastError && chrome.runtime.lastError.message) ||
               "Erro desconhecido ao conectar com o conector nativo.";
 
+            const installScript = CONFIG.getInstallScriptName ? CONFIG.getInstallScriptName() : (isLinux ? "./install_host.sh" : "install_host.bat");
             const frag = document.createDocumentFragment();
             const strong = document.createElement("strong");
             strong.textContent = "Não foi possível executar automaticamente: ";
@@ -351,7 +366,7 @@
             frag.appendChild(document.createElement("br"));
             const hint = document.createElement("span");
             hint.innerHTML =
-              '💡 <em>Dica: execute o script <code>install_host.bat</code> na pasta da extensão para registrar o conector, ou use o botão <strong>Copiar Comando</strong> ao lado!</em>';
+              `💡 <em>Dica: execute o script <code>${installScript}</code> na subpasta <code>native_host</code> para registrar o conector, ou use o botão <strong>Copiar Comando</strong> ao lado!</em>`;
             frag.appendChild(hint);
             showBanner(frag, "error");
           } else {

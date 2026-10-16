@@ -5,8 +5,9 @@
 ![yt-dlp](https://img.shields.io/badge/Engine-yt--dlp-red?style=flat-square)
 ![FFmpeg](https://img.shields.io/badge/Audio-FFmpeg-green?logo=ffmpeg&logoColor=white&style=flat-square)
 ![Windows](https://img.shields.io/badge/OS-Windows-0078D6?logo=windows&logoColor=white&style=flat-square)
+![Linux](https://img.shields.io/badge/OS-Linux-FCC624?logo=linux&logoColor=black&style=flat-square)
 
-Uma extensão moderna para **Google Chrome** (Manifest V3) que adiciona um botão integrado diretamente à interface do YouTube para extração e download de áudio em altíssima qualidade utilizando o poder do **yt-dlp** e **FFmpeg**.
+Uma extensão moderna para **Google Chrome** (Manifest V3) que adiciona um botão integrado diretamente à interface do YouTube para extração e download de áudio em altíssima qualidade utilizando o poder do **yt-dlp** e **FFmpeg** no **Windows** e **Linux**.
 
 ---
 
@@ -105,31 +106,52 @@ Extencao_chrome/
 │   └── constants.js           # Constantes compartilhadas, validação e utilitários
 └── native_host/
     ├── com.ytdlp.downloader.example.json  # Modelo de manifesto do Native Messaging Host
-    ├── host.bat               # Ponto de entrada chamado pelo Chrome
-    ├── host.ps1               # Script PowerShell que processa mensagens e executa o yt-dlp
-    ├── install_host.bat       # Instalador inteligente do conector com validação
-    └── uninstall_host.bat     # Script de remoção do registro e limpeza local
+    ├── host.bat               # Ponto de entrada chamado pelo Chrome no Windows
+    ├── host.ps1               # Script PowerShell que processa mensagens no Windows
+    ├── install_host.bat       # Instalador inteligente do conector no Windows
+    ├── uninstall_host.bat     # Script de remoção do registro no Windows
+    ├── host.py                # Processador Native Messaging multiplataforma (Linux/POSIX)
+    ├── host.sh                # Ponto de entrada chamado pelo Chrome no Linux
+    ├── install_host.sh        # Instalador inteligente do conector no Linux (Chrome/Brave/Edge)
+    └── uninstall_host.sh      # Script de remoção do manifesto no Linux
 ```
 
 ### Fluxo de Comunicação:
 1. **YouTube (Content Script)** ➡️ O usuário clica no botão e confirma os parâmetros na modal.
 2. **Service Worker** ➡️ Recebe a mensagem e a encaminha através da API `chrome.runtime.sendNativeMessage`.
-3. **Native Host (`host.bat` + `host.ps1`)** ➡️ Chrome inicia o conector via `stdio`, o script valida os dados, localiza o `yt-dlp` e `ffmpeg` e inicia o download em uma janela de terminal visível com barra de progresso.
+3. **Native Host:**
+   - **No Windows (`host.bat` + `host.ps1`):** Chrome inicia o conector via `stdio`, valida os dados e abre o terminal (`cmd.exe`).
+   - **No Linux (`host.sh` + `host.py`):** Chrome inicia o conector via `stdio`, valida os dados e dispara o terminal gráfico ativo (`gnome-terminal`, `x-terminal-emulator`, etc.) exibindo o progresso em tempo real.
 
 ---
 
 ## 📋 Pré-requisitos
 
-Para que o **Modo Direto** funcione corretamente, seu computador Windows deve ter:
+Para que o **Modo Direto** funcione corretamente, seu computador deve ter:
 
 1. **Google Chrome** (ou navegador baseado em Chromium como Brave, Edge, Opera).
 2. **yt-dlp:** O utilitário de download.
 3. **FFmpeg:** Necessário para conversão e extração de áudio para os formatos selecionados.
+4. **Python 3:** Necessário para a execução do conector no Linux (já incluído nativamente na maioria das distros).
 
-### Como instalar os pré-requisitos via WinGet (PowerShell):
+### Como instalar os pré-requisitos:
 
+#### 🐧 No Linux:
+- **Ubuntu / Debian / Linux Mint / Pop!_OS:**
+  ```bash
+  sudo apt update && sudo apt install yt-dlp ffmpeg python3
+  ```
+- **Fedora / RHEL:**
+  ```bash
+  sudo dnf install yt-dlp ffmpeg python3
+  ```
+- **Arch Linux / Manjaro:**
+  ```bash
+  sudo pacman -S yt-dlp ffmpeg python
+  ```
+
+#### 🪟 No Windows:
 Abra o PowerShell como Administrador e execute:
-
 ```powershell
 # Instalar yt-dlp
 winget install yt-dlp.yt-dlp
@@ -150,28 +172,39 @@ winget install Gyan.FFmpeg
 2. No canto superior direito, ative a opção **Modo do desenvolvedor**.
 3. Clique no botão **Carregar sem compactação** (*Load unpacked*).
 4. Selecione a pasta raiz deste projeto:
-   ```text
-   C:\caminho\para\Extencao_chrome
-   ```
+   - No Windows: `C:\caminho\para\Extencao_chrome`
+   - No Linux: `/home/seu-usuario/caminho/para/Extencao_chrome`
 5. A extensão aparecerá na lista. **Copie o ID gerado** (uma sequência de 32 letras, ex: `lmhindcobmakbimhfioifcnbpgbhhkpo`).
 
 ---
 
 ### 2. Configurar o Conector Nativo (Native Messaging Host)
 
+#### 🐧 No Linux:
+1. Abra um terminal na pasta do projeto e acesse a subpasta `native_host`:
+   ```bash
+   cd native_host
+   chmod +x install_host.sh host.sh host.py
+   ./install_host.sh
+   ```
+2. O instalador inteligente solicitará o **ID da extensão**:
+   - Cole o ID copiado no passo anterior (prefixos como `chrome-extension://` serão removidos automaticamente).
+   - Se já tiver instalado anteriormente, apenas pressione `ENTER` para manter o ID atual.
+3. O script valida o formato do ID, gera o manifesto local `com.ytdlp.downloader.json` e registra automaticamente em:
+   - `~/.config/google-chrome/NativeMessagingHosts/`
+   - `~/.config/chromium/NativeMessagingHosts/`
+   - `~/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts/`
+   - `~/.config/microsoft-edge/NativeMessagingHosts/`
+
+#### 🪟 No Windows:
 1. Navegue até a subpasta `native_host`:
    ```text
    C:\caminho\para\Extencao_chrome\native_host
    ```
 2. Dê um duplo-clique no arquivo **`install_host.bat`**.
-3. O instalador inteligente solicitará o **ID da extensão**:
-   - Se estiver instalando pela primeira vez, cole o ID copiado no passo anterior (prefixos como `chrome-extension://` serão removidos automaticamente).
-   - Se já tiver instalado anteriormente, apenas pressione `ENTER` para manter o ID atual.
-4. O script valida o formato do ID, gera o arquivo local `com.ytdlp.downloader.json` com os caminhos absolutos corretos e registra o host no Registro do Windows:
-   ```text
-   HKCU\Software\Google\Chrome\NativeMessagingHosts\com.ytdlp.downloader
-   ```
-5. Para testar, clique no ícone da extensão no Chrome e verifique se o status exibe **"Conector Ativo"** (círculo verde).
+3. Informe o ID da extensão e pressione `ENTER`. O conector será configurado no Registro do Windows (`HKCU\Software\Google\Chrome\NativeMessagingHosts`).
+
+4. Para testar em qualquer sistema, clique no ícone da extensão no Chrome e verifique se o status exibe **"Conector Ativo"** (círculo verde).
 
 ---
 
@@ -216,16 +249,17 @@ Clicando no ícone da extensão na barra superior do navegador:
 - Caso esteja em uma playlist ou YouTube Shorts, certifique-se de estar na página principal de reprodução do vídeo.
 
 ### Erro: "yt-dlp não foi encontrado no sistema"
-- Certifique-se de que o `yt-dlp` está instalado e presente no `PATH` do Windows.
-- No terminal PowerShell, execute `yt-dlp --version` para testar se ele é reconhecido.
-- Se instalou recentemente, reinicie o Chrome para recarregar as variáveis de ambiente.
+- Certifique-se de que o `yt-dlp` está instalado e presente no `PATH` do sistema.
+- No terminal, execute `yt-dlp --version` para testar se ele é reconhecido.
+- Se instalou recentemente, reinicie o navegador para recarregar as variáveis de ambiente.
 
 ### Conector aparece como "Não Conectado" no Popup
-- Execute novamente o arquivo `native_host/install_host.bat` e garanta que informou o ID exato exibido em `chrome://extensions/`.
-- Verifique se a política de execução de scripts do PowerShell permite a execução (`Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`).
+- **No Linux:** Execute novamente `./native_host/install_host.sh` e confirme se o ID copiado de `chrome://extensions/` está correto.
+- **No Windows:** Execute novamente `native_host/install_host.bat` e garanta que informou o ID exato exibido em `chrome://extensions/`. Verifique também a política de execução (`Set-ExecutionPolicy RemoteSigned -Scope CurrentUser`).
 
 ### Como desinstalar o conector nativo?
-- Basta executar o arquivo `native_host/uninstall_host.bat`. Ele removerá a chave do registro do Windows e manterá o sistema limpo.
+- **No Linux:** Execute `./native_host/uninstall_host.sh`. Ele removerá os manifestos das pastas de configuração dos navegadores.
+- **No Windows:** Execute `native_host/uninstall_host.bat`. Ele removerá a chave do registro do Windows.
 
 ---
 
